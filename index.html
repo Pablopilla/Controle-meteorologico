@@ -231,7 +231,7 @@
             type="text" 
             id="latitude" 
             name="entry.64571418" 
-            placeholder="-23.550520" 
+            placeholder="-23.550" 
             required 
           />
         </div>
@@ -242,7 +242,7 @@
             type="text" 
             id="longitude" 
             name="entry.591484335" 
-            placeholder="-46.633308" 
+            placeholder="-46.633" 
             required 
           />
         </div>
@@ -327,8 +327,8 @@
             }
           }
 
-          inputLat.value = position.coords.latitude.toFixed(6);
-          inputLng.value = position.coords.longitude.toFixed(6);
+          inputLat.value = position.coords.latitude.toFixed(3);
+          inputLng.value = position.coords.longitude.toFixed(3);
 
           btnGps.disabled = false;
           gpsText.textContent = 'Coordenadas Atualizadas';
