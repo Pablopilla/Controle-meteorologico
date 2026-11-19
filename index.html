@@ -281,8 +281,14 @@
         statusBanner.textContent = '';
       }
 
-      // Captura de Geolocalização via Browser API (HTTPS obrigatório no GitHub Pages)
-      btnGps.addEventListener('click', () => {
+      function requestPosition(options) {
+        return new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, options);
+        });
+      }
+
+      // Captura de Geolocalização via Browser API (HTTPS ou localhost obrigatório)
+      btnGps.addEventListener('click', async () => {
         clearStatus();
 
         if (!('geolocation' in navigator)) {
@@ -290,35 +296,60 @@
           return;
         }
 
+        if (!window.isSecureContext) {
+          showStatus('error', 'A geolocalização exige HTTPS ou localhost.');
+          return;
+        }
+
         btnGps.disabled = true;
         gpsText.innerHTML = '<span class="spinner"></span> Buscando sinal GPS...';
 
-        navigator.geolocation.getCurrentPosition(
-          (position) => {
-            inputLat.value = position.coords.latitude.toFixed(6);
-            inputLng.value = position.coords.longitude.toFixed(6);
-
-            btnGps.disabled = false;
-            gpsText.textContent = 'Coordenadas Atualizadas';
-            showStatus('success', `GPS capturado com precisão de ~${Math.round(position.coords.accuracy)}m.`);
-          },
-          (error) => {
-            btnGps.disabled = false;
-            gpsText.textContent = 'Tentar Novamente';
-
-            const errorMessages = {
-              1: 'Permissão de localização negada. Libere o acesso no navegador.',
-              2: 'Sinal de localização indisponível no momento.',
-              3: 'Tempo limite esgotado ao buscar coordenadas.'
-            };
-            showStatus('error', errorMessages[error.code] || 'Erro ao obter localização.');
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 0
+        try {
+          let position;
+          try {
+            // 1ª tentativa: alta precisão (GPS)
+            position = await requestPosition({
+              enableHighAccuracy: true,
+              timeout: 8000,
+              maximumAge: 0
+            });
+          } catch (highAccError) {
+            // Se falhou por sinal indisponível (2) ou timeout (3), tenta Wi-Fi/rede
+            if (highAccError.code === 2 || highAccError.code === 3) {
+              gpsText.innerHTML = '<span class="spinner"></span> Tentando via rede/Wi-Fi...';
+              position = await requestPosition({
+                enableHighAccuracy: false,
+                timeout: 12000,
+                maximumAge: 60000
+              });
+            } else {
+              throw highAccError;
+            }
           }
-        );
+
+          inputLat.value = position.coords.latitude.toFixed(6);
+          inputLng.value = position.coords.longitude.toFixed(6);
+
+          btnGps.disabled = false;
+          gpsText.textContent = 'Coordenadas Atualizadas';
+          showStatus(
+            'success',
+            `GPS capturado com precisão de ~${Math.round(position.coords.accuracy)}m.`
+          );
+        } catch (error) {
+          btnGps.disabled = false;
+          gpsText.textContent = 'Tentar Novamente';
+
+          const errorMessages = {
+            1: 'Permissão negada no navegador ou no sistema operacional.',
+            2: 'Localização indisponível. Verifique o GPS/Wi-Fi ou a localização do sistema.',
+            3: 'Tempo esgotado ao buscar localização. Tente novamente em local aberto.'
+          };
+
+          const baseMsg = errorMessages[error.code] || 'Erro ao obter localização.';
+          const detail = error.message ? ` (${error.message})` : '';
+          showStatus('error', `${baseMsg}${detail}`);
+        }
       });
 
       // Envio assíncrono sem sair da página
